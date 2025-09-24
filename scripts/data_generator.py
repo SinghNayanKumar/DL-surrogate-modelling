@@ -7,7 +7,7 @@ from scipy.stats import qmc
 # 1. DEFINE THE PARAMETER SPACE
 # =============================================================================
 # Define the number of simulations to run
-NUM_SAMPLES = 10 # Start with a small number for testing, e.g., 10. Then increase to 1000+.
+NUM_SAMPLES = 1500 # Start with a small number for testing, e.g., 10. Then increase to 1000+.
 
 # Define the ranges for each continuous parameter [min, max]
 param_space = {
