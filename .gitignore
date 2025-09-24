@@ -1,0 +1,78 @@
+# =============================================================================
+# Project-Specific Generated Data (IMPORTANT)
+# This section prevents your large datasets and images from being committed.
+# =============================================================================
+
+# Raw H5 simulation data from FEniCSx
+output_data_3d/
+
+# Voxelized NPZ data for U-Net models
+output_voxel_data/
+
+# Generated PNG images for visualization
+output_images_3d/
+
+# Summary CSV file for baseline models
+simulation_summary.csv
+
+
+# =============================================================================
+# Python Cache and Dependencies
+# =============================================================================
+
+# Python virtual environment folders
+venv/
+.venv/
+env/
+.env/
+env.bak/
+venv.bak/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+
+# =============================================================================
+# IDE and Editor Configuration Files
+# =============================================================================
+
+# Visual Studio Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Vim swap files
+*.swp
+*.swo
+
+
+# =============================================================================
+# Operating System Specific Files
+# =============================================================================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+
+# =============================================================================
+# Other Common Ignores
+# =============================================================================
+
+# Log files
+*.log
+
+# Environment variables file (should never be committed)
+.env
