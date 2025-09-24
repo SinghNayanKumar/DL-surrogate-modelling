@@ -1,0 +1,7 @@
+matplotlib
+pyvista
+scipy
+gmsh
+h5py
+tqdm
+pandas
