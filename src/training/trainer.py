@@ -87,16 +87,43 @@ class ModelTrainer:
         best_val_loss = float('inf')
         for epoch in range(1, num_epochs + 1):
             self.epoch = epoch # Store epoch for progress bar description
+
+            # --- Training Step ---
             train_loss, train_data_loss, train_pde_loss = self._run_epoch(self.train_loader, is_train=True)
             print(f"Epoch {epoch:03d} | Train Loss: {train_loss:.6f} | Data Loss: {train_data_loss:.6f} | PDE Loss: {train_pde_loss:.6f}")
-
+            
             # Validation is always done without the PDE loss term for a fair comparison of data-fit.
             with torch.no_grad():
                 val_loss, val_data_loss, _ = self._run_epoch(self.val_loader, is_train=False)
             print(f"Epoch {epoch:03d} | Val Loss:   {val_loss:.6f} | Val Data Loss: {val_data_loss:.6f}")
 
+            # ### --- W&B INTEGRATION --- ###
+            # Log all metrics to W&B for this epoch
+            wandb.log({
+                "epoch": epoch,
+                "train/total_loss": train_loss,
+                "train/data_loss": train_data_loss,
+                "train/pde_loss": train_pde_loss,
+                "val/total_loss": val_loss,
+                "val/data_loss": val_data_loss,
+                # We can also track learning rate if using a scheduler
+                "learning_rate": self.optimizer.param_groups[0]['lr'] 
+            })
+            # ### --- END W&B INTEGRATION --- ###
+
+            # --- Model Checkpointing ---
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                save_path = f"best_model_{self.config['experiment_name']}.pth"
+                # The save path now uses the name from trainer_config, which is the W&B run name
+                save_path = f"checkpoints/best_model_{self.config['experiment_name']}.pth"
+                
+                # Create the checkpoints directory if it doesn't exist
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                
                 torch.save(self.model.state_dict(), save_path)
                 print(f"  -> New best model saved to {save_path}")
+                
+                # ### --- W&B INTEGRATION --- ###
+                # Update the summary metrics in W&B to reflect the best score
+                wandb.summary['best_val_loss'] = best_val_loss
+                wandb.summary['best_epoch'] = epoch

@@ -13,7 +13,7 @@ class IBeamGraphDataset(Dataset):
     that include both positional information and the physical parameters of the simulation.
     """
 
-    def __init__(self, root_dir, h5_file_list, stats):
+    def __init__(self, root_dir, h5_file_list, stats=None):
         """
         Args:
             root_dir (string): Directory where processed data might be stored (a PyG convention).
@@ -22,8 +22,12 @@ class IBeamGraphDataset(Dataset):
         """
         self.root_dir = root_dir
         self.h5_files = h5_file_list
-        self.mean_y = stats['mean_y']
-        self.std_y = stats['std_y']
+        if stats:
+            self.mean_y = stats['mean_y']
+            self.std_y = stats['std_y']
+        else:
+            self.mean_y = None
+            self.std_y = None
         super(IBeamGraphDataset, self).__init__(root_dir)
 
     def len(self):
@@ -57,7 +61,13 @@ class IBeamGraphDataset(Dataset):
             # This is what our GNN will learn to predict.
             # Shape: [num_nodes, 3]
             displacement = torch.tensor(f['displacement'][:], dtype=torch.float)
-            normalized_displacement = (displacement - self.mean_y) / self.std_y
+            
+            # Conditionally normalize the target displacement
+            if self.mean_y is not None and self.std_y is not None:
+                normalized_displacement = (displacement - self.mean_y) / self.std_y
+            else:
+                # If no stats are provided, use the raw displacement
+                normalized_displacement = displacement
 
             
             # --- 4. Node Features (x): This is the actual input to the GNN layers. ---

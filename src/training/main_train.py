@@ -2,6 +2,7 @@ import os
 import glob
 import torch
 import argparse
+import wandb
 from sklearn.model_selection import train_test_split
 from torch_geometric.loader import DataLoader as PyGDataLoader
 from torch.utils.data import DataLoader as TorchDataLoader
@@ -23,6 +24,27 @@ MODEL_MAPPING = {
 def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
+
+    # ### --- W&B INTEGRATION --- ###
+    # Initialize a new W&B run
+    
+    # Consolidate experiment naming logic
+    base_name = args.model_type
+    if args.model_type == 'unet' and args.use_attention:
+        base_name += '_attention'
+    
+    if args.use_pinn:
+        experiment_name = f"{base_name}_pinn_w{args.pinn_weight}"
+    else:
+        experiment_name = f"{base_name}_data"
+
+    wandb.init(
+        project="DL-surrogate-modelling",  # <-- CHOOSE A PROJECT NAME
+        entity="nayan-ksingh-indian-institute-of-technology",          # <-- YOUR W&B USERNAME
+        name=experiment_name,
+        config=vars(args) # This will log all command-line arguments
+    )
+    # ### --- END W&B INTEGRATION --- ###
 
     # --- Data Loading and Splitting ---
     is_gnn = args.model_type in ['gcn', 'gat', 'mpnn', 'transformer']
@@ -65,7 +87,6 @@ def main(args):
     print(f"Data loaded: {len(train_dataset)} train, {len(val_dataset)} val, {len(test_files)} test samples.")
 
     # --- Model Selection ---
-        # --- Model Selection ---
     # Update the input feature dimensions based on the expanded parameter space.
     # Total parameters = 9 continuous + 2 categorical = 11
     NUM_SIMULATION_PARAMS = 11
@@ -98,15 +119,20 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # --- Trainer Configuration ---
+
     trainer_config = {
         'model_type': args.model_type,
-        'experiment_name': f"{args.model_type}_{'pinn' if args.use_pinn else 'data'}",
         'use_pinn': args.use_pinn,
-        'pinn_weight': args.pinn_weight
+        'pinn_weight': args.pinn_weight,
+        'experiment_name': wandb.run.name # Use the W&B run name for saving the model
     }
+
+    print(f"Starting experiment: {experiment_name}") # Good to log this
     
     trainer = ModelTrainer(model, train_loader, val_loader, optimizer, device, trainer_config)
     trainer.train(args.epochs)
+
+    wandb.finish()
 
 
 if __name__ == '__main__':
@@ -124,8 +150,4 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_size', type=int, default=128, help="Hidden dimension size for GNN models")
     
     args = parser.parse_args()
-        # Update the experiment name to include attention
-    if args.model_type == 'unet' and args.use_attention:
-        args.experiment_name = "unet_attention"
-    
     main(args)
