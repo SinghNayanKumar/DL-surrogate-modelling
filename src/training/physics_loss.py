@@ -78,11 +78,10 @@ def pde_loss(displacement, coords, youngs_modulus, poissons_ratio, batch):
     Computes the mean squared error of the PDE residual. 
     This is the value that gets added to the main loss function.
     """
-    # ### --- CHANGE --- ###
     # Expand material properties to match the number of nodes in each graph of the batch
     E_per_node = youngs_modulus[batch]
     nu_per_node = poissons_ratio[batch]
     
     residual = navier_cauchy_residual(displacement, coords, E_per_node, nu_per_node)
     # The loss is the mean of the squared residual vectors.
-    return residual.pow(2).mean()
+    return residual.pow(2).mean().to(torch.float32)

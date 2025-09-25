@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch_geometric.nn import TransformerConv
-from models.gnn_variants import GNN_Base
+from src.models.gnn_variants import GNN_Base
 
 class GraphTransformer_Surrogate(GNN_Base):
     """ GNN using Graph Transformer layers. """

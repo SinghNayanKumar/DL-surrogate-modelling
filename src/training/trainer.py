@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-from training.physics_loss import pde_loss
+from src.training.physics_loss import pde_loss
 from torch_geometric.data import Data 
 
 class ModelTrainer:
@@ -35,12 +35,13 @@ class ModelTrainer:
             # The entire PINN logic is refactored for correct gradient flow.
             
             # --- Step 1: Prepare inputs and enable gradients for PINN ---
-            pde_loss_val = torch.tensor(0.0, device=self.device)
+            pde_loss_val = torch.tensor(0.0, device=self.device, dtype=torch.float32)
             if self.use_pinn and self.model_type != 'unet':
                 # For PINN, the input coordinates MUST have gradients enabled to compute derivatives.
                 # We clone `data.pos` which contains the original coordinates.
                 pinn_inputs = data.clone()
-                pinn_inputs.pos.requires_grad_(True)
+                pinn_inputs.x = pinn_inputs.x.to(torch.float32)
+                pinn_inputs.pos = pinn_inputs.pos.to(torch.float32).requires_grad_(True)
                 # The model's forward pass now receives the graph with grad-enabled positions
                 outputs = self.model(pinn_inputs)
             else:
@@ -58,8 +59,8 @@ class ModelTrainer:
                 # and the grad-enabled `pinn_inputs.pos` to calculate the physical residual.
                 
                 # Unpack material properties for the current batch
-                youngs_modulus = data.material_props[:, 0]
-                poissons_ratio = data.material_props[:, 1]
+                youngs_modulus = data.material_props[:, 0].to(torch.float32)
+                poissons_ratio = data.material_props[:, 1].to(torch.float32)
                 
                 # The graph batching in PyG needs to be handled. We need to pass the batch index.
                 pde_loss_val = pde_loss(outputs, pinn_inputs.pos, youngs_modulus, poissons_ratio, batch=pinn_inputs.batch)

@@ -83,3 +83,5 @@ data/**
 #FEA data
 FEA_Ground_Truth_Data/**
 
+#wand
+wandb/**

@@ -49,7 +49,7 @@ class IBeamGraphDataset(Dataset):
             # --- 1. Node Positions (pos): The raw 3D coordinates of each mesh node. ---
             # This is kept separate and is primarily used for positional information.
             # Shape: [num_nodes, 3]
-            node_coords = torch.tensor(f['node_coordinates'][:], dtype=torch.float)
+            node_coords = torch.from_numpy(f['node_coordinates'][:]).to(torch.float32)
 
             # --- 2. Graph Connectivity (edge_index): Derived from the mesh topology. ---
             # Describes which nodes are connected.
@@ -60,7 +60,7 @@ class IBeamGraphDataset(Dataset):
             # --- 3. Ground Truth Labels (y): The 3D displacement vector for each node. ---
             # This is what our GNN will learn to predict.
             # Shape: [num_nodes, 3]
-            displacement = torch.tensor(f['displacement'][:], dtype=torch.float)
+            displacement = torch.from_numpy(f['displacement'][:]).to(torch.float32)
             
             # Conditionally normalize the target displacement
             if self.mean_y is not None and self.std_y is not None:
@@ -92,7 +92,7 @@ class IBeamGraphDataset(Dataset):
                 load_type_map.get(f.attrs.get('load_type', 'bending_y'), 0.0),
                 load_dist_map.get(f.attrs.get('load_distribution', 'uniform'), 0.0)
             ]
-            params = torch.tensor(params_list, dtype=torch.float)
+            params = torch.tensor(params_list, dtype=torch.float32)
 
             # 4c. Broadcast scalar parameters to every node.
             num_nodes = node_coords.shape[0]
@@ -107,7 +107,7 @@ class IBeamGraphDataset(Dataset):
             material_props = torch.tensor([
                 f.attrs.get('youngs_modulus', 2.1e11),
                 f.attrs.get('poissons_ratio', 0.3)
-            ], dtype=torch.float)
+            ], dtype=torch.float32)
 
             # --- Construct the PyG Data object ---
             graph_data = Data(
