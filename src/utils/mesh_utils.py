@@ -17,6 +17,17 @@ def tetra_to_edges(topology):
     """
     # Extract unique edges from the tetrahedral elements
     topology = np.asarray(topology)
+
+    # Handle VTK-style flattened topology 
+    if topology.ndim == 1 and topology.size % 5 == 0:
+        print("Detected VTK-style topology. Reshaping and slicing...")
+        # Reshape into (num_cells, 5)
+        topology = topology.reshape(-1, 5)
+        # Slice off the first column (which contains the cell type '4')
+        topology = topology[:, 1:]
+
+    
+    topology = topology.reshape(-1, 4)
     edges = set()
     for tetra in topology:
         # Sort to ensure (i, j) and (j, i) are treated as the same edge

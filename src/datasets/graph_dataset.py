@@ -3,19 +3,23 @@ import glob
 import torch
 import h5py
 from torch_geometric.data import Dataset, Data
-from utils.mesh_utils import tetra_to_edges
+from src.utils.mesh_utils import tetra_to_edges
 
 class IBeamGraphDataset(Dataset):
     """ Custom PyG Dataset for loading I-Beam FEA simulation data from H5 files. 
     Each sample in the dataset is a single graph representing one FEA simulation."""
-    def __init__(self, root_dir, h5_file_list):
+
+    def __init__(self, root_dir, h5_file_list, stats):
         """
         Args:
             root_dir (string): Directory with all the .h5 files.
-            ?transform (callable, optional): Optional transform to be applied on a sample.
+            h5_file_list (list): List of specific H5 files to include in this dataset.
+            stats (dict): A dictionary containing 'mean_y' and 'std_y' tensors.
         """
         self.root_dir = root_dir
         self.h5_files = h5_file_list
+        self.mean_y = stats['mean_y']
+        self.std_y = stats['std_y']
         super(IBeamGraphDataset, self).__init__(root_dir)
 
     def len(self):
@@ -40,19 +44,24 @@ class IBeamGraphDataset(Dataset):
             # 2. Graph Connectivity (edge_index): Derived from the mesh topology.
             # Shape: [2, num_edges]
             topology = f['topology'][:]
-            edge_index = tetra_to_edges(topology)
+            
 
             # 3. Ground Truth Labels (y): The 3D displacement vector for each node.
             # This is what our GNN will learn to predict.
             # Shape: [num_nodes, 3]
             displacement = torch.tensor(f['displacement'][:], dtype=torch.float)
+            # --- FIX: NORMALIZE THE TARGET VARIABLE ---
+            normalized_displacement = (displacement - self.mean_y) / self.std_y
+
+            edge_index = tetra_to_edges(topology)
             
              # --- Construct the PyG Data object ---
             graph_data = Data(
                 x=node_coords,          # Node features [N, 3] (initial coordinates)
                 edge_index=edge_index,  # Graph connectivity [2, E]
-                y=displacement,         # Ground truth labels [N, 3]
+                y=normalized_displacement,         # Ground truth labels [N, 3]
                 pos=node_coords,        # Positional information for visualization or transforms
+                original_y=displacement
             )
             
             # Example of adding global features from H5 attributes

@@ -7,12 +7,13 @@ from torch_geometric.loader import DataLoader as PyGDataLoader
 from torch.utils.data import DataLoader as TorchDataLoader
 
 # Import all our custom modules
-from datasets.graph_dataset import IBeamGraphDataset
-from datasets.voxel_dataset import IBeamVoxelDataset
-from models.gnn_variants import GCN_Surrogate, GAT_Surrogate, MPNN_Surrogate
-from models.graph_transformer import GraphTransformer_Surrogate
-from models.unet_variants import UNet3D
-from training.trainer import ModelTrainer
+from src.datasets.graph_dataset import IBeamGraphDataset
+from src.datasets.voxel_dataset import IBeamVoxelDataset
+from src.models.gnn_variants import GCN_Surrogate, GAT_Surrogate, MPNN_Surrogate
+from src.models.graph_transformer import GraphTransformer_Surrogate
+from src.models.unet_variants import UNet3D
+from src.training.trainer import ModelTrainer
+from src.utils.stats import compute_and_save_stats, compute_and_save_voxel_stats 
 
 MODEL_MAPPING = {
     'gcn': GCN_Surrogate, 'gat': GAT_Surrogate, 'mpnn': MPNN_Surrogate,
@@ -25,24 +26,37 @@ def main(args):
 
     # --- Data Loading and Splitting ---
     is_gnn = args.model_type in ['gcn', 'gat', 'mpnn', 'transformer']
-    if is_gnn:
-        all_files = sorted(glob.glob(os.path.join(args.data_dir, '*.h5')))
-    else: # unet
-        all_files = sorted(glob.glob(os.path.join(args.data_dir, '*.npz')))
+    data_subdir = 'h5_raw' if is_gnn else 'voxelized'
+    data_ext = '*.h5' if is_gnn else '*.npz'
+    data_dir = os.path.join(args.base_data_dir, data_subdir)
+    
+    all_files = sorted(glob.glob(os.path.join(data_dir, data_ext)))
     
     train_files, test_files = train_test_split(all_files, test_size=0.2, random_state=42)
     train_files, val_files = train_test_split(train_files, test_size=0.125, random_state=42) # 0.125 * 0.8 = 0.1
 
+
+    # --- COMPUTE AND LOAD NORMALIZATION STATS ---
+    stats = {}
     if is_gnn:
-        train_dataset = IBeamGraphDataset(root_dir=args.data_dir, h5_file_list=train_files)
-        val_dataset = IBeamGraphDataset(root_dir=args.data_dir, h5_file_list=val_files)
+        stats_path = os.path.join(args.base_data_dir, 'gnn_stats.pt')
+        mean_y, std_y = compute_and_save_stats(train_files, stats_path)
+        stats = {'mean_y': mean_y, 'std_y': std_y}
+    else: # unet
+        stats_path = os.path.join(args.base_data_dir, 'voxel_stats.pt')
+        mean_y, std_y = compute_and_save_voxel_stats(train_files, stats_path)
+        stats = {'mean_y': mean_y, 'std_y': std_y}
+
+    if is_gnn:
+        train_dataset = IBeamGraphDataset(root_dir=data_dir, h5_file_list=train_files, stats=stats)
+        val_dataset = IBeamGraphDataset(root_dir=data_dir, h5_file_list=val_files, stats=stats)
         train_loader = PyGDataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_loader = PyGDataLoader(val_dataset, batch_size=args.batch_size)
-    else:
-        train_dataset = IBeamVoxelDataset(file_list=train_files)
-        val_dataset = IBeamVoxelDataset(file_list=val_files)
-        train_loader = TorchDataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        val_loader = TorchDataLoader(val_dataset, batch_size=args.batch_size)
+    else: # unet
+        train_dataset = IBeamVoxelDataset(file_list=train_files, stats=stats)
+        val_dataset = IBeamVoxelDataset(file_list=val_files, stats=stats)
+        train_loader = TorchDataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
+        val_loader = TorchDataLoader(val_dataset, batch_size=args.batch_size, num_workers=4)
         
     print(f"Data loaded: {len(train_dataset)} train, {len(val_dataset)} val, {len(test_files)} test samples.")
 
@@ -77,6 +91,7 @@ if __name__ == '__main__':
     # PINN specific arguments
     parser.add_argument('--use_pinn', action='store_true', help="Enable Physics-Informed loss term")
     parser.add_argument('--pinn_weight', type=float, default=1e-6, help="Weight for the PDE loss")
+    parser.add_argument('--base_data_dir', type=str, default='data', help="Base directory for all data")
     
     args = parser.parse_args()
     main(args)
