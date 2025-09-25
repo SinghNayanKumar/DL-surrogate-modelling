@@ -1,8 +1,10 @@
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
+import wandb
 from src.training.physics_loss import pde_loss
 from torch_geometric.data import Data 
+import os
 
 class ModelTrainer:
     def __init__(self, model, train_loader, val_loader, optimizer, device, config):

@@ -1,6 +1,10 @@
 import torch
 import numpy as np
 
+# ### --- QUALITY OF LIFE FIX --- ###
+# Use a flag to ensure the message is printed only once per run.
+_vtk_message_printed = False
+
 def tetra_to_edges(topology):
     """
     Converts a tensor of tetrahedral elements to a graph edge index.
@@ -15,12 +19,17 @@ def tetra_to_edges(topology):
         torch.Tensor: A tensor of shape (2, num_edges) representing the
                       undirected graph connectivity (edge_index).
     """
+     # Declare that we are modifying the global variable at the start of the function.
+    global _vtk_message_printed
+    
     # Extract unique edges from the tetrahedral elements
     topology = np.asarray(topology)
 
     # Handle VTK-style flattened topology 
     if topology.ndim == 1 and topology.size % 5 == 0:
-        print("Detected VTK-style topology. Reshaping and slicing...")
+        if not _vtk_message_printed: # Only print if the flag is False
+            print("Detected VTK-style topology. Reshaping and slicing...")
+            _vtk_message_printed = True # Set the flag to True so it won't print again
         # Reshape into (num_cells, 5)
         topology = topology.reshape(-1, 5)
         # Slice off the first column (which contains the cell type '4')

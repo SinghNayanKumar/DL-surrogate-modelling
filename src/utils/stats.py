@@ -24,7 +24,7 @@ def compute_and_save_stats(file_list, stats_path):
     all_displacements = []
     for h5_path in tqdm(file_list, desc="Reading files for stats"):
         with h5py.File(h5_path, 'r') as f:
-            displacement = torch.from_numpy(f['displacement'][:])
+            displacement = torch.from_numpy(f['displacement'][:]).to(torch.float32)
             all_displacements.append(displacement)
 
     # Concatenate all tensors into one large tensor
@@ -67,7 +67,7 @@ def compute_and_save_voxel_stats(file_list, stats_path):
     for npz_path in tqdm(file_list, desc="Voxel Stats (Pass 1/2: Mean)"):
         with np.load(npz_path) as data:
             # Shape: (3, D, H, W)
-            displacement = torch.from_numpy(data['displacement_field'])
+            displacement = torch.from_numpy(data['displacement_field']).to(torch.float32)
             # Sum over all spatial dimensions, keep the channel dimension
             mean_accumulator += displacement.sum(dim=(1, 2, 3))
             total_voxels += displacement.shape[1] * displacement.shape[2] * displacement.shape[3]
@@ -78,7 +78,7 @@ def compute_and_save_voxel_stats(file_list, stats_path):
     std_accumulator = torch.zeros(3)
     for npz_path in tqdm(file_list, desc="Voxel Stats (Pass 2/2: Std)"):
         with np.load(npz_path) as data:
-            displacement = torch.from_numpy(data['displacement_field'])
+            displacement = torch.from_numpy(data['displacement_field']).to(torch.float32)
             # Reshape mean for broadcasting: [3] -> [3, 1, 1, 1]
             reshaped_mean = mean_y.view(3, 1, 1, 1)
             # Sum of squared differences

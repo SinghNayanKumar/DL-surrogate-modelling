@@ -85,3 +85,6 @@ FEA_Ground_Truth_Data/**
 
 #wand
 wandb/**
+
+#models
+*.pth
