@@ -5,3 +5,7 @@ gmsh
 h5py
 tqdm
 pandas
+torch
+torch-geometric
+numpy
+scikit-learn

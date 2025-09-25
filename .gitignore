@@ -76,3 +76,10 @@ Thumbs.db
 
 # Environment variables file (should never be committed)
 .env
+
+#data
+data/**
+
+#FEA data
+FEA_Ground_Truth_Data/**
+
