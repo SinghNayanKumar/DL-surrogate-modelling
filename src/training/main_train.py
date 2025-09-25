@@ -13,7 +13,7 @@ from src.models.gnn_variants import GCN_Surrogate, GAT_Surrogate, MPNN_Surrogate
 from src.models.graph_transformer import GraphTransformer_Surrogate
 from src.models.unet_variants import UNet3D
 from src.training.trainer import ModelTrainer
-from src.utils.stats import compute_and_save_stats, compute_and_save_voxel_stats 
+from src.utils.stats import compute_and_save_stats, compute_and_save_voxel_stats, compute_and_save_param_stats
 
 MODEL_MAPPING = {
     'gcn': GCN_Surrogate, 'gat': GAT_Surrogate, 'mpnn': MPNN_Surrogate,
@@ -43,9 +43,13 @@ def main(args):
         mean_y, std_y = compute_and_save_stats(train_files, stats_path)
         stats = {'mean_y': mean_y, 'std_y': std_y}
     else: # unet
-        stats_path = os.path.join(args.base_data_dir, 'voxel_stats.pt')
-        mean_y, std_y = compute_and_save_voxel_stats(train_files, stats_path)
-        stats = {'mean_y': mean_y, 'std_y': std_y}
+        # Output stats
+        voxel_stats_path = os.path.join(args.base_data_dir, 'voxel_stats.pt')
+        mean_y, std_y = compute_and_save_voxel_stats(train_files, voxel_stats_path)
+        # Input stats
+        param_stats_path = os.path.join(args.base_data_dir, 'param_stats.pt')
+        mean_x, std_x = compute_and_save_param_stats(train_files, param_stats_path)
+        stats = {'mean_y': mean_y, 'std_y': std_y, 'mean_x_params': mean_x, 'std_x_params': std_x}
 
     if is_gnn:
         train_dataset = IBeamGraphDataset(root_dir=data_dir, h5_file_list=train_files, stats=stats)
@@ -61,11 +65,35 @@ def main(args):
     print(f"Data loaded: {len(train_dataset)} train, {len(val_dataset)} val, {len(test_files)} test samples.")
 
     # --- Model Selection ---
+        # --- Model Selection ---
+    # Update the input feature dimensions based on the expanded parameter space.
+    # Total parameters = 9 continuous + 2 categorical = 11
+    NUM_SIMULATION_PARAMS = 11
+    
     model_class = MODEL_MAPPING[args.model_type]
     if is_gnn:
-        model = model_class(node_in_features=3, node_out_features=3, hidden_size=128).to(device)
-    else:
-        model = model_class(in_channels=1, out_channels=3).to(device)
+        # Node features = 3 (coords) + 11 (params) = 14
+        num_node_features = 3 + NUM_SIMULATION_PARAMS
+        model = model_class(
+            node_in_features=num_node_features, 
+            node_out_features=3, 
+            hidden_size=args.hidden_size # Use argparse for hidden_size
+        ).to(device)
+    else: # unet
+        # Input channels = 1 (geometry) + 11 (params) = 12
+        num_input_channels = 1 + NUM_SIMULATION_PARAMS
+        model = model_class(
+            in_channels=num_input_channels, 
+            out_channels=3, 
+            use_attention=args.use_attention
+        ).to(device)
+    
+    # It's good practice to print the model architecture
+    print("\n--- Model Architecture ---")
+    print(model)
+    num_model_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total Trainable Parameters: {num_model_params:,}")
+    print("--------------------------\n")
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -88,10 +116,16 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--use_attention', action='store_true', help="Enable Attention blocks in the U-Net model")
     # PINN specific arguments
     parser.add_argument('--use_pinn', action='store_true', help="Enable Physics-Informed loss term")
     parser.add_argument('--pinn_weight', type=float, default=1e-6, help="Weight for the PDE loss")
     parser.add_argument('--base_data_dir', type=str, default='data', help="Base directory for all data")
+    parser.add_argument('--hidden_size', type=int, default=128, help="Hidden dimension size for GNN models")
     
     args = parser.parse_args()
+        # Update the experiment name to include attention
+    if args.model_type == 'unet' and args.use_attention:
+        args.experiment_name = "unet_attention"
+    
     main(args)

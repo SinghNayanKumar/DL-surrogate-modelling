@@ -95,3 +95,34 @@ def compute_and_save_voxel_stats(file_list, stats_path):
     print(f"  - Std (y):  {std_y.numpy()}")
     
     return mean_y, std_y
+
+def compute_and_save_param_stats(file_list, stats_path):
+    """
+    Computes mean/std for the 'simulation_params' saved in NPZ files.
+    """
+    if os.path.exists(stats_path):
+        print(f"Parameter statistics file already exists at {stats_path}. Loading stats.")
+        stats = torch.load(stats_path)
+        return stats['mean_x_params'], stats['std_x_params']
+
+    print(f"Computing parameter statistics from {len(file_list)} training files...")
+    
+    all_params = []
+    for npz_path in tqdm(file_list, desc="Reading files for param stats"):
+        with np.load(npz_path) as data:
+            params = torch.from_numpy(data['simulation_params'])
+            all_params.append(params)
+
+    all_params = torch.stack(all_params, dim=0)
+    mean_x_params = all_params.mean(dim=0)
+    std_x_params = all_params.std(dim=0)
+    std_x_params[std_x_params == 0] = 1.0
+
+    stats = {'mean_x_params': mean_x_params, 'std_x_params': std_x_params}
+    torch.save(stats, stats_path)
+    
+    print(f"Parameter statistics computed and saved to {stats_path}")
+    print(f"  - Mean (x_params): {mean_x_params.numpy()}")
+    print(f"  - Std (x_params):  {std_x_params.numpy()}")
+    
+    return mean_x_params, std_x_params
