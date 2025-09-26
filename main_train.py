@@ -6,19 +6,20 @@ import wandb
 from sklearn.model_selection import train_test_split
 from torch_geometric.loader import DataLoader as PyGDataLoader
 from torch.utils.data import DataLoader as TorchDataLoader
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 # Import all our custom modules
 from src.datasets.graph_dataset import IBeamGraphDataset
 from src.datasets.voxel_dataset import IBeamVoxelDataset
 from src.models.gnn_variants import GCN_Surrogate, GAT_Surrogate, MPNN_Surrogate
 from src.models.graph_transformer import GraphTransformer_Surrogate
-from src.models.unet_variants import UNet3D
+from src.models.unet_variants import UNet3D, UNet3D_Small
 from src.training.trainer import ModelTrainer
 from src.utils.stats import compute_and_save_stats, compute_and_save_voxel_stats, compute_and_save_param_stats
 
 MODEL_MAPPING = {
     'gcn': GCN_Surrogate, 'gat': GAT_Surrogate, 'mpnn': MPNN_Surrogate,
-    'transformer': GraphTransformer_Surrogate, 'unet': UNet3D,
+    'transformer': GraphTransformer_Surrogate, 'unet': UNet3D,'unet_small': UNet3D_Small,
 }
 
 def main(args):
@@ -48,8 +49,18 @@ def main(args):
 
     # --- Data Loading and Splitting ---
     is_gnn = args.model_type in ['gcn', 'gat', 'mpnn', 'transformer']
-    data_subdir = 'h5_raw' if is_gnn else 'voxelized'
-    data_ext = '*.h5' if is_gnn else '*.npz'
+    
+    if is_gnn:
+        data_subdir = 'h5_raw'
+        data_ext = '*.h5'
+    elif args.model_type == 'unet':
+        # This is the original, slow model, so point to the (now deleted) original data
+        data_subdir = 'voxelized' 
+        data_ext = '*.npz'
+    else: # unet_small
+        data_subdir = 'voxelized_small' # <-- Point to the new, fast data
+        data_ext = '*.npz'
+        
     data_dir = os.path.join(args.base_data_dir, data_subdir)
     
     all_files = sorted(glob.glob(os.path.join(data_dir, data_ext)))
@@ -64,12 +75,12 @@ def main(args):
         stats_path = os.path.join(args.base_data_dir, 'gnn_stats.pt')
         mean_y, std_y = compute_and_save_stats(train_files, stats_path)
         stats = {'mean_y': mean_y, 'std_y': std_y}
-    else: # unet
-        # Output stats
-        voxel_stats_path = os.path.join(args.base_data_dir, 'voxel_stats.pt')
+    else: # unet or unet_small
+        stats_suffix = '_small' if 'small' in args.model_type else ''
+        voxel_stats_path = os.path.join(args.base_data_dir, f'voxel_stats{stats_suffix}.pt')
+        param_stats_path = os.path.join(args.base_data_dir, f'param_stats{stats_suffix}.pt')
+        
         mean_y, std_y = compute_and_save_voxel_stats(train_files, voxel_stats_path)
-        # Input stats
-        param_stats_path = os.path.join(args.base_data_dir, 'param_stats.pt')
         mean_x, std_x = compute_and_save_param_stats(train_files, param_stats_path)
         stats = {'mean_y': mean_y, 'std_y': std_y, 'mean_x_params': mean_x, 'std_x_params': std_x}
 
@@ -117,6 +128,13 @@ def main(args):
     print("--------------------------\n")
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # The scheduler will reduce the LR if the val_loss doesn't improve for 10 epochs
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=10, verbose=True)
+
+    # Pass the scheduler to the trainer
+    trainer = ModelTrainer(model, train_loader, val_loader, optimizer, device, trainer_config, scheduler=scheduler)
+
+    
 
     # --- Trainer Configuration ---
 

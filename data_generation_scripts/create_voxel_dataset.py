@@ -9,9 +9,9 @@ from tqdm import tqdm
 # This is the resolution of the output 3D "image". Adjust based on your GPU memory.
 # The order is (Depth, Height, Width), corresponding to (Z, Y, X) axes.
 # For an I-beam, Z (length) is typically the longest dimension.
-VOXEL_RESOLUTION = (128, 64, 64) 
+VOXEL_RESOLUTION = (64, 32, 32) 
 INPUT_DIR = "data/h5_raw"  # Updated to match project structure
-OUTPUT_DIR = "data/voxelized" # Updated to match project structure
+OUTPUT_DIR = "data/voxelized_small" # Updated to match project structure
 INTERPOLATION_METHOD = 'linear' # 'linear' offers a good balance of speed and accuracy.
 
 # =============================================================================

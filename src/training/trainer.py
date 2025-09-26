@@ -7,11 +7,12 @@ from torch_geometric.data import Data
 import os
 
 class ModelTrainer:
-    def __init__(self, model, train_loader, val_loader, optimizer, device, config):
+    def __init__(self, model, train_loader, val_loader, optimizer, device, config, scheduler=None):
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
         self.config = config
         self.model_type = config['model_type']
@@ -24,14 +25,15 @@ class ModelTrainer:
         
         # ### --- NOTE --- ### The `desc` provides a descriptive label for the progress bar.
         for data in tqdm(loader, desc=f"Epoch {self.epoch:03d} - {'Train' if is_train else 'Valid'}"):
-            if self.model_type == 'unet':
+            if self.model_type.startswith('unet'):
                 inputs, targets = data
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
             else: # GNNs
                 data = data.to(self.device)
+                # For GNNs, the `inputs` are the entire graph object, and `targets` are a specific attribute.
                 inputs, targets = data, data.y
             
-            if is_train: self.optimizer.zero_grad()
+            if is_train: self.optimizer.zero_grad(set_to_none=True) # Use set_to_none=True for slight perf gain
             
             
             # The entire PINN logic is refactored for correct gradient flow.
@@ -113,6 +115,11 @@ class ModelTrainer:
                 "learning_rate": self.optimizer.param_groups[0]['lr'] 
             })
             # ### --- END W&B INTEGRATION --- ###
+
+            # ### --- SCHEDULER STEP --- ###
+            # Step the scheduler based on the validation loss
+            if self.scheduler:
+                self.scheduler.step(val_loss)
 
             # --- Model Checkpointing ---
             if val_loss < best_val_loss:

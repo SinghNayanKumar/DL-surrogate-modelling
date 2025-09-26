@@ -127,3 +127,30 @@ class UNet3D(nn.Module):
         x = self.up3(x, x1)
         logits = self.outc(x)
         return logits
+    
+class UNet3D_Small(nn.Module):
+    """ A smaller, faster version of the 3D U-Net with fewer channels. """
+    def __init__(self, in_channels, out_channels, use_attention=False):
+        super(UNet3D_Small, self).__init__()
+        conv_block = AttnDoubleConv3D if use_attention else DoubleConv3D
+        
+        # Reduced channel sizes from 64->128->256->512 to 32->64->128->256
+        self.inc = conv_block(in_channels, 32)
+        self.down1 = Down(32, 64, use_attention)
+        self.down2 = Down(64, 128, use_attention)
+        self.down3 = Down(128, 256, use_attention)
+        self.up1 = Up(256, 128, use_attention)
+        self.up2 = Up(128, 64, use_attention)
+        self.up3 = Up(64, 32, use_attention)
+        self.outc = OutConv(32, out_channels)
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x = self.up1(x4, x3)
+        x = self.up2(x, x2)
+        x = self.up3(x, x1)
+        logits = self.outc(x)
+        return logits
