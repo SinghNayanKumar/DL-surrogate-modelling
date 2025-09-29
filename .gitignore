@@ -79,6 +79,8 @@ Thumbs.db
 
 #data
 data/**
+low_value/**
+*.zip
 
 #FEA data
 FEA_Ground_Truth_Data/**
@@ -88,3 +90,4 @@ wandb/**
 
 #models
 *.pth
+*.h5

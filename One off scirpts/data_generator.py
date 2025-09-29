@@ -7,7 +7,7 @@ from scipy.stats import qmc
 # 1. DEFINE THE PARAMETER SPACE
 # =============================================================================
 # Define the number of simulations to run
-NUM_SAMPLES = 1500 # Start with a small number for testing, e.g., 10. Then increase to 1000+.
+NUM_SAMPLES = 1000 # Start with a small number for testing, e.g., 10. Then increase to 1000+.
 
 # Define the ranges for each continuous parameter [min, max]
 param_space = {
@@ -19,7 +19,7 @@ param_space = {
     "fillet_radius": [10.0, 14.0],
     "youngs_modulus": [190e3, 210e3],  # Steel variations
     "poissons_ratio": [0.28, 0.32],
-    "force_magnitude": [1000.0, 2000.0],
+    "force_magnitude": [200000.0, 250000.0], # 200 kN to 250 kN
 }
 
 # Define categorical parameters
@@ -46,8 +46,8 @@ for i in range(NUM_SAMPLES):
     print(f"\n{'='*20} Running Simulation ID: {i}/{NUM_SAMPLES-1} {'='*20}")
 
     params = {keys[j]: scaled_samples[i, j] for j in range(len(keys))}
-    chosen_load_type = np.random.choice(load_types)
-    chosen_distribution = np.random.choice(load_distributions)
+    chosen_load_type = "bending_y" # Hard-code for the specialist dataset -> Generalist: np.random.choice(load_types)
+    chosen_distribution = np.random.choice(load_distributions) 
 
     command = ["python", "scripts/run_ibeam_parametric.py", f"--sim_id={i}"]
     for key, value in params.items():

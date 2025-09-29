@@ -126,3 +126,79 @@ def compute_and_save_param_stats(file_list, stats_path):
     print(f"  - Std (x_params):  {std_x_params.numpy()}")
     
     return mean_x_params, std_x_params
+
+def compute_and_save_graph_input_stats(file_list, stats_path, use_one_hot=False):
+    """
+    Computes the mean and standard deviation of the GNN's input node features.
+    This function is now flexible and can handle both multi-modal (one-hot) and
+    unimodal (scalar) feature constructions.
+
+    Args:
+        file_list (list): List of paths to the .h5 files (training set).
+        stats_path (str): Path to save the computed statistics (.pt file).
+        use_one_hot (bool): Flag to determine the feature construction method.
+    """
+    if os.path.exists(stats_path):
+        print(f"Graph input statistics file already exists at {stats_path}. Loading stats.")
+        stats = torch.load(stats_path)
+        return stats['mean_x'], stats['std_x']
+
+    print(f"Computing graph input statistics from {len(file_list)} training files...")
+    print(f"Feature construction mode: {'One-Hot (Multi-modal)' if use_one_hot else 'Scalar (Unimodal)'}")
+    
+    all_features = []
+    
+    for h5_path in tqdm(file_list, desc="Reading files for input stats"):
+        with h5py.File(h5_path, 'r') as f:
+            node_coords = torch.from_numpy(f['node_coordinates'][:]).to(torch.float32)
+            num_nodes = node_coords.shape[0]
+            load_type_str = f.attrs.get('load_type', 'bending_y')
+
+            # --- This is the new conditional logic ---
+            if use_one_hot:
+                # Build 16-dimensional feature vector for the GENERALIST model
+                one_hot_map = {"bending_y": [1.0, 0.0, 0.0], "bending_x": [0.0, 1.0, 0.0], "torsion":   [0.0, 0.0, 1.0]}
+                one_hot_load_type = torch.tensor(one_hot_map.get(load_type_str, [1.0, 0.0, 0.0]), dtype=torch.float32)
+                params_list = [
+                    f.attrs.get('beam_length', 300.0), f.attrs.get('flange_width', 100.0),
+                    f.attrs.get('flange_thickness', 15.0), f.attrs.get('web_thickness', 10.0),
+                    f.attrs.get('beam_depth', 150.0), f.attrs.get('fillet_radius', 12.0),
+                    f.attrs.get('youngs_modulus', 2.1e11), f.attrs.get('poissons_ratio', 0.3),
+                    f.attrs.get('force_magnitude', 1500.0),
+                    {"uniform": 0.0, "linear_y": 1.0}.get(f.attrs.get('load_distribution', 'uniform'), 0.0)
+                ]
+                params = torch.tensor(params_list, dtype=torch.float32)
+                params_per_node = params.unsqueeze(0).repeat(num_nodes, 1)
+                one_hot_per_node = one_hot_load_type.unsqueeze(0).repeat(num_nodes, 1)
+                node_features = torch.cat([node_coords, params_per_node, one_hot_per_node], dim=1)
+            else:
+                # Build 14-dimensional feature vector for the SPECIALIST model
+                load_type_map = {"bending_y": 0.0, "bending_x": 1.0, "torsion": 2.0}
+                params_list = [
+                    f.attrs.get('beam_length', 300.0), f.attrs.get('flange_width', 100.0),
+                    f.attrs.get('flange_thickness', 15.0), f.attrs.get('web_thickness', 10.0),
+                    f.attrs.get('beam_depth', 150.0), f.attrs.get('fillet_radius', 12.0),
+                    f.attrs.get('youngs_modulus', 2.1e11), f.attrs.get('poissons_ratio', 0.3),
+                    f.attrs.get('force_magnitude', 1500.0),
+                    load_type_map.get(load_type_str, 0.0),
+                    {"uniform": 0.0, "linear_y": 1.0}.get(f.attrs.get('load_distribution', 'uniform'), 0.0)
+                ]
+                params = torch.tensor(params_list, dtype=torch.float32)
+                params_per_node = params.unsqueeze(0).repeat(num_nodes, 1)
+                node_features = torch.cat([node_coords, params_per_node], dim=1)
+
+            all_features.append(node_features)
+
+    all_features = torch.cat(all_features, dim=0)
+    mean_x = all_features.mean(dim=0)
+    std_x = all_features.std(dim=0)
+    std_x[std_x == 0] = 1.0
+
+    stats = {'mean_x': mean_x, 'std_x': std_x}
+    torch.save(stats, stats_path)
+    
+    print(f"Graph input statistics computed and saved to {stats_path}")
+    print(f"  - Mean (x): {mean_x.numpy()}")
+    print(f"  - Std (x):  {std_x.numpy()}")
+    
+    return mean_x, std_x
