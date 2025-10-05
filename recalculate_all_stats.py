@@ -15,7 +15,7 @@ from src.utils.stats import (
 # =============================================================================
 # SCRIPT CONFIGURATION - SINGLE SOURCE OF TRUTH
 # =============================================================================
-DATA_BASE_DIR = "data"
+DATA_BASE_DIR = "low_value"
 
 # --- Define the MASTER source of all simulation data ---
 # This is the single source of truth for our data split.

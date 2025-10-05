@@ -112,7 +112,7 @@ class IBeamGraphDataset(Dataset):
             else:
                 normalized_features = node_features
 
-            material_props = torch.tensor([f.attrs.get('youngs_modulus', 2.1e11), f.attrs.get('poissons_ratio', 0.3)], dtype=torch.float32)
+            material_props = torch.tensor([[f.attrs.get('youngs_modulus', 2.1e11), f.attrs.get('poissons_ratio', 0.3)]], dtype=torch.float32)
 
             graph_data = Data(
                 x=normalized_features, 

@@ -2,20 +2,25 @@ import subprocess
 import sys
 
 # Define the base command to avoid repetition
-BASE_PYTHON_CMD = [sys.executable, "main_train.py", "--epochs", "200", "--batch_size", "16", "--lr", "1e-4", "--use_pinn"]
+BASE_PYTHON_CMD = [sys.executable, "main_train.py", "--epochs", "300", "--batch_size", "2", "--lr", "1e-5",]
 
 # A list of all experiments to run. Each experiment is a list of additional command-line args.
 experiments = [
     # --- Phase 1: GNN Generalist Baselines (Multi-modal) ---
     #["--model_type", "gcn", "--data_dir", "data/h5_multi_modal", "--ablation_one_hot", "--experiment_suffix", "generalist"],
     #["--model_type", "gat", "--data_dir", "data/h5_multi_modal", "--ablation_one_hot", "--experiment_suffix", "generalist"],
-    #["--model_type", "mpnn", "--data_dir", "data/h5_multi_modal", "--ablation_one_hot", "--experiment_suffix", "generalist"],
+    #["--model_type", "mpnn", "--data_dir", "data/h5_multi_modal", "--ablation_one_hot", "--experiment_suffix", "pinn_generalist",
+     #"--use_pinn", "True",
+     #"--pinn_weight", "1e7" ],
     #["--model_type", "transformer", "--data_dir", "data/h5_multi_modal", "--ablation_one_hot", "--experiment_suffix", "generalist"],
 
     # --- Phase 2: GNN Specialist Baselines (Unimodal) ---
     #["--model_type", "gcn", "--data_dir", "data/h5_raw", "--experiment_suffix", "specialist_bending_y"],
     #["--model_type", "gat", "--data_dir", "data/h5_raw", "--experiment_suffix", "specialist_bending_y"],
-    ["--model_type", "mpnn", "--data_dir", "data/h5_raw", "--experiment_suffix", "pinn_specialist_bending_y"],
+    ["--model_type", "mpnn", "--data_dir", "data/h5_raw", "--experiment_suffix", "pinn_specialist_bending_y",
+     "--use_pinn", "True",
+     "--pinn_weight", "500",
+      "--hidden_size", "64" ],
     #["--model_type", "transformer", "--data_dir", "data/h5_raw", "--experiment_suffix", "specialist_bending_y"],
 
     # --- Phase 3: U-Net Baselines (Multi-modal Voxel Data) ---

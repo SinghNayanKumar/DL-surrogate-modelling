@@ -1,7 +1,7 @@
 import torch
 
 try:
-    scalar_stats = torch.load('data/trns/gnn_stats_x_scalar.pt')
+    scalar_stats = torch.load('data/gnn_stats_x_scalar.pt')
     onehot_stats = torch.load('data/gnn_stats_x_onehot.pt')
 
     print("--- Scalar Stats (Specialist) ---")

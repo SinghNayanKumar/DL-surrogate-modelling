@@ -46,8 +46,8 @@ for i in range(NUM_SAMPLES):
     print(f"\n{'='*20} Running Simulation ID: {i}/{NUM_SAMPLES-1} {'='*20}")
 
     params = {keys[j]: scaled_samples[i, j] for j in range(len(keys))}
-    #chosen_load_type = np.random.choice(load_types)
-    chosen_distribution = "bending_y" # Hard-code for the specialist dataset -> Generalist: #np.random.choice(load_distributions)
+    chosen_load_type = "bending_y" # Hard-code for the specialist dataset -> Generalist: #np.random.choice(load_types)
+    chosen_distribution = np.random.choice(load_distributions)
 
     command = ["python", "scripts/run_ibeam_parametric.py", f"--sim_id={i}"]
     for key, value in params.items():

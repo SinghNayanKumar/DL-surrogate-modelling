@@ -102,8 +102,12 @@ def main(args):
         else:
             num_node_features = 14 # coords(3) + params(11)
             print("Initializing GNN for UNIMODAL (Specialist) training with 14 input features.")
-        
-        model = model_class(node_in_features=num_node_features, node_out_features=3, hidden_size=args.hidden_size).to(device)
+
+        model = model_class(node_in_features=num_node_features, 
+                            node_out_features=3, 
+                            hidden_size=args.hidden_size,
+                            use_pinn=args.use_pinn
+                        ).to(device)
     else:
         # U-Net logic remains the same for now
         num_input_channels = 1 + 11 # geometry + params
@@ -111,15 +115,24 @@ def main(args):
     
     print(f"Total Trainable Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-6)
     scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=10)
 
-    trainer_config = {'model_type': args.model_type, 'use_pinn': args.use_pinn, 'pinn_weight': args.pinn_weight, 'experiment_name': wandb.run.name}
+    trainer_config = {'model_type': args.model_type, 'use_pinn': args.use_pinn, 'pinn_weight': args.pinn_weight, 'experiment_name': wandb.run.name,  'stats': stats}
     trainer = ModelTrainer(model, train_loader, val_loader, optimizer, device, trainer_config, scheduler=scheduler)
     trainer.train(args.epochs)
     wandb.finish()
 
 if __name__ == '__main__':
+    def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
     parser = argparse.ArgumentParser(description="FEA Surrogate Model Training")
     parser.add_argument('--model_type', type=str, required=True, choices=MODEL_MAPPING.keys())
     # ### --- CHANGE --- ### Added data_dir argument
@@ -129,11 +142,21 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--hidden_size', type=int, default=128)
     parser.add_argument('--use_attention', action='store_true')
-    parser.add_argument('--use_pinn', action='store_true')
+    parser.add_argument('--use_pinn', type=str2bool, nargs='?',
+                    const=True, default=False,
+                    help="Activate PINN training.")
     parser.add_argument('--pinn_weight', type=float, default=1e-6)
+    parser.add_argument('--pinn_warmup_epochs', type=int, default=0, help="Number of epochs for data-only pre-training before introducing PINN loss.")
     parser.add_argument('--ablation_one_hot', action='store_true', help="Use one-hot encoding for load_type. MUST be used for multi-modal training.")
     # ### --- CHANGE --- ### Added for better naming in W&B
     parser.add_argument('--experiment_suffix', type=str, default="", help="Optional suffix for the W&B experiment name (e.g., 'unimodal')")
     
+    
     args = parser.parse_args()
+
+    # === ADD A VERIFICATION STEP FOR YOUR SANITY ===
+    print("-" * 50)
+    print(f"PINN ACTIVATED: {args.use_pinn}")
+    print("-" * 50)
+    
     main(args)

@@ -104,7 +104,7 @@ class OutConv(nn.Module):
         
 class UNet3D(nn.Module):
     """ Standard 3D U-Net Model """
-    def __init__(self, in_channels, out_channels, use_attention=False):
+    def __init__(self, in_channels, out_channels, use_attention=False, **kwargs):
         super(UNet3D, self).__init__()
         conv_block = AttnDoubleConv3D if use_attention else DoubleConv3D
         
@@ -130,7 +130,7 @@ class UNet3D(nn.Module):
     
 class UNet3D_Small(nn.Module):
     """ A smaller, faster version of the 3D U-Net with fewer channels. """
-    def __init__(self, in_channels, out_channels, use_attention=False):
+    def __init__(self, in_channels, out_channels, use_attention=False, **kwargs):
         super(UNet3D_Small, self).__init__()
         conv_block = AttnDoubleConv3D if use_attention else DoubleConv3D
         
