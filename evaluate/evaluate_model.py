@@ -42,22 +42,18 @@ def evaluate_single_model(config):
         
     _, test_files = train_test_split(all_files, test_size=0.2, random_state=42)
     
-    # ========================================================================
-    # NEW: Check for visualization config and create directory
-    # ========================================================================
     save_for_viz = config.get('save_for_visualization', False)
     viz_indices = config.get('visualization_indices', [0])
     viz_output_dir = config.get('visualization_output_dir', 'results/visualizations')
     if save_for_viz:
         os.makedirs(viz_output_dir, exist_ok=True)
-    # ========================================================================
 
     if is_gnn:
         test_dataset = IBeamGraphDataset(root_dir=config['data_dir'], h5_file_list=test_files, stats=stats, use_one_hot=config.get('ablation_one_hot', False))
-        test_loader = PyGDataLoader(test_dataset, batch_size=1) # Set batch size to 1 for easier indexing
+        test_loader = PyGDataLoader(test_dataset, batch_size=1)
     else:
         test_dataset = IBeamVoxelDataset(file_list=test_files, stats=stats)
-        test_loader = TorchDataLoader(test_dataset, batch_size=1) # Set batch size to 1
+        test_loader = TorchDataLoader(test_dataset, batch_size=1)
 
     model_class = MODEL_MAPPING[model_type]
     
@@ -75,7 +71,6 @@ def evaluate_single_model(config):
     total_inference_time = 0.0
     
     with torch.no_grad():
-        # Using enumerate to get the index of each sample
         for i, data in tqdm(enumerate(test_loader), desc="Evaluating", total=len(test_loader)):
             start_time = time.perf_counter()
             if is_gnn:
@@ -95,11 +90,8 @@ def evaluate_single_model(config):
                 unnorm_preds = preds * std_y.view(1, 3, 1, 1, 1) + mean_y.view(1, 3, 1, 1, 1)
                 unnorm_targets = targets * std_y.view(1, 3, 1, 1, 1) + mean_y.view(1, 3, 1, 1, 1)
 
-            # ========================================================================
-            # NEW: Logic to save the raw prediction arrays for visualization
-            # ========================================================================
             if save_for_viz and i in viz_indices:
-                model_name_safe = config['model_name'].replace(' ', '_').replace('(', '').replace(')', '')
+                model_name_safe = config['model_name'].replace(' ', '_').replace('+', '').replace('(', '').replace(')', '')
                 output_path = os.path.join(viz_output_dir, f"{model_name_safe}_testsample_{i}.npz")
                 
                 save_payload = {
@@ -108,26 +100,39 @@ def evaluate_single_model(config):
                 }
                 
                 if is_gnn:
-                    # For GNNs, we must also save the node positions to reconstruct the mesh
                     save_payload['node_coordinates'] = data.pos.cpu().numpy()
-                    # Also save the path to the original H5 to get the topology
                     save_payload['original_h5_path'] = test_files[i]
+                else:
+                    # --- THE DEFINITIVE FIX ---
+                    # The original bug was saving the processed mask from the 'inputs' tensor.
+                    # This code loads the original, unmodified mask directly from the data file.
+                    current_npz_path = test_files[i]
+                    with np.load(current_npz_path) as original_data:
+                        mask_key = 'geometry' if 'geometry' in original_data else 'geometry_mask'
+                        if mask_key not in original_data:
+                            raise KeyError(f"Fatal: Could not find geometry mask in {current_npz_path}")
+                        save_payload['geometry_mask'] = original_data[mask_key]
+                    # --- END FIX ---
 
-                print(f"\nSaving visualization data for sample {i} to {output_path}")
+                    # Infer the path to the original .h5 file for topology
+                    base_filename = os.path.basename(current_npz_path).replace('.npz', '.h5')
+                    h5_dir = os.path.join(os.path.dirname(config['data_dir']), 'h5_raw_unimodal')
+                    inferred_h5_path = os.path.join(h5_dir, base_filename)
+                    save_payload['original_h5_path'] = inferred_h5_path
+
+                print(f"\nSaving CORRECTED visualization data for sample {i} to {output_path}")
                 np.savez_compressed(output_path, **save_payload)
-            # ========================================================================
 
             all_preds.append(unnorm_preds.cpu().numpy())
             all_targets.append(unnorm_targets.cpu().numpy())
             total_inference_time += (end_time - start_time)
 
-    # ... The rest of the script for calculating metrics remains the same ...
     all_preds = np.concatenate([p.reshape(p.shape[0], -1) for p in all_preds], axis=1) if not is_gnn else np.concatenate(all_preds, axis=0)
     all_targets = np.concatenate([t.reshape(t.shape[0], -1) for t in all_targets], axis=1) if not is_gnn else np.concatenate(all_targets, axis=0)
     all_preds = all_preds.reshape(-1, 3)
     all_targets = all_targets.reshape(-1, 3)
 
-    mae_mm = np.mean(np.abs(all_preds - all_targets)) * 1000 # Convert from m to mm
+    mae_mm = np.mean(np.abs(all_preds - all_targets)) * 1000
     rl2_percent = 100 * np.linalg.norm(all_preds - all_targets) / np.linalg.norm(all_targets)
     ss_res = np.sum((all_targets - all_preds) ** 2)
     ss_tot = np.sum((all_targets - np.mean(all_targets, axis=0)) ** 2)

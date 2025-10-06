@@ -91,3 +91,5 @@ wandb/**
 #models
 *.pth
 *.h5
+
+*.npz
